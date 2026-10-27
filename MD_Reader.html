@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MD Reader - a calmer way to read Markdown</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* =========================
+   THEME TOKENS
+========================= */
+
+:root {
+  --bg: #F3EEE2;
+  --surface: #FFFDF7;
+  --surface-alt: #EAE2CD;
+  --border: #DFD5B8;
+  --text: #241F17;
+  --text-muted: #6B6250;
+  --text-faint: #948A70;
+  --accent: #21395A;
+  --accent-hover: #17283F;
+  --accent-contrast: #F3EEE2;
+  --gold: #A6772C;
+  --code-bg: #221F19;
+  --code-text: #F3EEE2;
+  --mark-bg: #E8CB80;
+  --mark-current-bg: #CB9A2E;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="sepia"]) {
+    --bg: #171613;
+    --surface: #201F1B;
+    --surface-alt: #2A2823;
+    --border: #38352C;
+    --text: #ECE6D6;
+    --text-muted: #AFA68F;
+    --text-faint: #837A64;
+    --accent: #8FB4DE;
+    --accent-hover: #A9C6E8;
+    --accent-contrast: #14243A;
+    --gold: #D9AE5C;
+    --code-bg: #100F0D;
+    --code-text: #ECE6D6;
+    --mark-bg: #6B551F;
+    --mark-current-bg: #967326;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #171613;
+  --surface: #201F1B;
+  --surface-alt: #2A2823;
+  --border: #38352C;
+  --text: #ECE6D6;
+  --text-muted: #AFA68F;
+  --text-faint: #837A64;
+  --accent: #8FB4DE;
+  --accent-hover: #A9C6E8;
+  --accent-contrast: #14243A;
+  --gold: #D9AE5C;
+  --code-bg: #100F0D;
+  --code-text: #ECE6D6;
+  --mark-bg: #6B551F;
+  --mark-current-bg: #967326;
+}
+
+:root[data-theme="sepia"] {
+  --bg: #EFE3C7;
+  --surface: #F7EDD4;
+  --surface-alt: #E6D6AC;
+  --border: #D8C595;
+  --text: #40331C;
+  --text-muted: #6E5A34;
+  --text-faint: #8C7648;
+  --accent: #6B4423;
+  --accent-hover: #52341A;
+  --accent-contrast: #F7EDD4;
+  --gold: #96631F;
+  --code-bg: #362915;
+  --code-text: #EFE3C7;
+  --mark-bg: #D9B45E;
+  --mark-current-bg: #B98B2E;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Public Sans', 'Noto Sans Bengali', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 32px 16px 60px;
+  transition: background-color .2s, color .2s;
+}
+
+.wrap { max-width: 720px; margin: 0 auto; }
+
+/* =========================
+   PROGRESS BAR
+========================= */
+
+#progressBar {
+  position: fixed;
+  top: 0; left: 0;
+  height: 3px;
+  width: 0%;
+  background: var(--gold);
+  z-index: 40;
+  transition: width .1s linear;
+}
+
+/* =========================
+   MASTHEAD
+========================= */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 20px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mark {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.mark svg { width: 20px; height: 20px; }
+
+h1 {
+  font-family: 'Fraunces', 'Noto Serif Bengali', serif;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: .2px;
+}
+
+.subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+/* =========================
+   DROPZONE
+========================= */
+
+#dropzone {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 46px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+
+#dropzone:hover, #dropzone.drag { border-color: var(--accent); background: var(--surface-alt); }
+#dropzone .icon { color: var(--text-faint); margin-bottom: 14px; transition: color .2s; }
+#dropzone:hover .icon { color: var(--accent); }
+#dropzone .main-text { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+#dropzone .sub-text { font-size: 13px; color: var(--text-faint); }
+
+#fileInput { display: none; }
+
+.paste-link {
+  display: block;
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--accent);
+  background: none; border: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+}
+
+#pastePanel { display: none; margin-top: 14px; }
+#pastePanel.show { display: block; }
+
+#pasteArea {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+#pasteArea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.paste-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* Recent files */
+
+#recentList { margin-top: 20px; }
+#recentList .recent-title { font-size: 12px; color: var(--text-faint); margin-bottom: 8px; text-transform: none; }
+
+.recent-item {
+  display: flex; justify-content: space-between; align-items: center;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  font-family: inherit;
+}
+
+.recent-item:hover { border-color: var(--accent); }
+.recent-item .rname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-item .rtime { color: var(--text-faint); font-size: 12px; flex-shrink: 0; margin-left: 10px; }
+
+/* =========================
+   TOOLBAR
+========================= */
+
+.toolbar { display: none; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; flex-wrap: wrap; }
+.toolbar.show { display: flex; }
+
+.filename {
+  font-size: 13px; color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 6px 14px; border-radius: 999px;
+  max-width: 45%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font-family: inherit; cursor: pointer; }
+
+button.new-file, button.pdf-btn {
+  font-size: 13px; border: none; padding: 9px 16px; border-radius: var(--radius-md); transition: background-color .2s, border-color .2s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+
+button.new-file { background: var(--accent); color: var(--accent-contrast); }
+button.new-file:hover { background: var(--accent-hover); }
+button.pdf-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+button.pdf-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+button:focus-visible, .recent-item:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* Reading tools row */
+
+.reading-tools {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  padding: 7px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.reading-tools.show { display: flex; }
+
+.icon-btn {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+
+.icon-btn:hover { background: var(--surface-alt); color: var(--text); }
+.icon-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.icon-btn svg { width: 16px; height: 16px; }
+
+.font-btn { font-family: 'Public Sans', sans-serif; font-size: 12px; font-weight: 600; }
+
+.tool-sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 3px; }
+
+.meta-text { font-size: 12px; color: var(--text-faint); margin-left: auto; padding-left: 8px; white-space: nowrap; }
+
+/* Search bar */
+
+#searchBar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+#searchBar.show { display: flex; }
+
+#searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 6px 2px;
+}
+
+#searchInput:focus { outline: none; }
+
+.search-count { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+
+/* =========================
+   TOC DRAWER
+========================= */
+
+#tocBackdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(20,17,10,.4);
+  z-index: 45;
+}
+
+#tocBackdrop.show { display: block; }
+
+#tocDrawer {
+  position: fixed;
+  top: 0; right: 0;
+  height: 100%;
+  width: min(300px, 85vw);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  z-index: 46;
+  transform: translateX(100%);
+  transition: transform .25s ease;
+  padding: 24px 20px;
+  overflow-y: auto;
+}
+
+#tocDrawer.show { transform: translateX(0); }
+
+#tocDrawer h2 {
+  font-family: 'Fraunces', 'Noto Serif Bengali', serif;
+  font-weight: 600;
+  font-size: 17px;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+#tocList a {
+  display: block;
+  padding: 8px 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  transition: color .15s;
+}
+
+#tocList a:hover { color: var(--accent); }
+#tocList a.lvl-2 { padding-left: 14px; }
+#tocList a.lvl-3 { padding-left: 28px; font-size: 13px; }
+#tocList a.toc-active { color: var(--accent); font-weight: 600; }
+
+.toc-close {
+  background: none; border: none; color: var(--text-muted);
+  position: absolute; top: 18px; right: 18px;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+}
+.toc-close:hover { background: var(--surface-alt); color: var(--text); }
+.toc-close svg { width: 14px; height: 14px; }
+
+/* =========================
+   PREVIEW
+========================= */
+
+#preview {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 36px 32px;
+  line-height: 1.75;
+  font-size: 16px;
+  color: var(--text);
+  font-family: 'Public Sans', 'Noto Sans Bengali', sans-serif;
+}
+
+#preview.show { display: block; }
+
+#preview h1, #preview h2, #preview h3, #preview h4 {
+  font-family: 'Fraunces', 'Noto Serif Bengali', serif;
+  font-weight: 600;
+  color: var(--text);
+  margin: 1.2em 0 0.5em;
+  line-height: 1.35;
+  scroll-margin-top: 20px;
+}
+
+#preview h1:first-child, #preview h2:first-child { margin-top: 0; }
+#preview h1 { font-size: 29px; }
+#preview h2 { font-size: 22px; border-bottom: 1px solid var(--border); padding-bottom: 9px; }
+#preview h3 { font-size: 19px; }
+#preview h4 { font-size: 17px; }
+#preview p { margin: 0.8em 0; }
+#preview strong { color: var(--text); font-weight: 700; }
+#preview ul, #preview ol { margin: 0.8em 0; padding-left: 1.4em; }
+#preview li { margin: 0.35em 0; }
+#preview a { color: var(--accent); font-weight: 600; }
+
+#preview table { width: 100%; border-collapse: collapse; margin: 1.2em 0; font-size: 14.5px; display: block; overflow-x: auto; }
+#preview th, #preview td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; }
+#preview th { background: var(--surface-alt); color: var(--text); font-weight: 700; }
+#preview tr:nth-child(even) td { background: var(--bg); }
+
+#preview hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
+
+#preview code {
+  background: var(--surface-alt);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 13.5px;
+}
+
+.code-block-wrap { position: relative; margin: 1em 0; }
+
+#preview pre {
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 16px;
+  padding-top: 40px;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  line-height: 1.6;
+  margin: 0;
+}
+
+#preview pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 13.5px;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: rgba(255,255,255,.08);
+  color: var(--code-text);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  padding: 5px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Public Sans', sans-serif;
+}
+
+.copy-btn:hover { background: rgba(255,255,255,.18); }
+.copy-btn svg { width: 12px; height: 12px; }
+
+#preview blockquote { border-left: 3px solid var(--gold); padding-left: 14px; color: var(--text-muted); margin: 1em 0; }
+#preview img { max-width: 100%; height: auto; border-radius: 8px; }
+
+#preview mark.hit { background: var(--mark-bg); color: inherit; border-radius: 2px; }
+#preview mark.hit.current { background: var(--mark-current-bg); }
+
+.empty-hint { text-align: center; color: var(--text-faint); font-size: 13px; margin-top: 16px; }
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 480px) {
+  body { padding: 22px 12px 40px; }
+  #preview { padding: 26px 18px; }
+  #preview h1 { font-size: 24px; }
+  #preview h2 { font-size: 20px; }
+  .filename { max-width: 100%; }
+  .toolbar { align-items: stretch; }
+  .actions { width: 100%; }
+  button.new-file, button.pdf-btn { flex: 1; justify-content: center; }
+  .meta-text { width: 100%; margin-left: 0; padding-left: 0; order: 10; padding-top: 4px; }
+}
+
+/* =========================
+   PRINT / PDF
+========================= */
+
+@media print {
+  @page { size: A4; margin: 18mm; }
+  body { background: white; padding: 0; color: #222; font-size: 12pt; }
+  .wrap { max-width: none; }
+  header, #dropzone, .paste-link, #pastePanel, #recentList, .toolbar, .reading-tools, #searchBar, #progressBar, #tocDrawer, #tocBackdrop, .empty-hint, .copy-btn {
+    display: none !important;
+  }
+  #preview {
+    display: block !important; border: none; border-radius: 0; padding: 0; background: white; color: #222;
+    font-size: 12pt; line-height: 1.7;
+  }
+  #preview h1, #preview h2, #preview h3, #preview h4 { color: #1F3A5F; break-after: avoid; page-break-after: avoid; }
+  #preview h1 { font-size: 24pt; }
+  #preview h2 { font-size: 18pt; }
+  #preview h3 { font-size: 15pt; }
+  #preview table { break-inside: avoid; page-break-inside: avoid; }
+  #preview tr { break-inside: avoid; page-break-inside: avoid; }
+  #preview pre { color: #222; background: #F2F2F2; border: 1px solid #DDD; white-space: pre-wrap; break-inside: avoid; page-break-inside: avoid; padding-top: 16px; }
+  #preview blockquote { break-inside: avoid; page-break-inside: avoid; }
+  #preview mark.hit { background: transparent; }
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="progressBar"></div>
+
+<div class="wrap">
+
+  <header>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>
+    </div>
+    <div>
+      <h1>MD Reader</h1>
+      <div class="subtitle">A calmer way to read your Markdown files</div>
+    </div>
+  </header>
+
+  <!-- DROPZONE -->
+  <div id="dropzone">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 0 1-1-7.9A5 5 0 0 1 16 8a4.5 4.5 0 0 1 1 8.9"/><path d="M12 12v7"/><path d="M9.3 14.7 12 12l2.7 2.7"/></svg>
+    </div>
+    <div class="main-text">Click to choose a .md file</div>
+    <div class="sub-text">or drag and drop it here</div>
+  </div>
+
+  <button class="paste-link" id="pasteToggle" type="button">Or paste Markdown text instead</button>
+
+  <div id="pastePanel">
+    <textarea id="pasteArea" placeholder="Paste your Markdown text here..." aria-label="Markdown text"></textarea>
+    <div class="paste-actions">
+      <button class="new-file" id="renderPasteBtn" type="button">Render</button>
+      <button class="pdf-btn" id="cancelPasteBtn" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <div id="recentList"></div>
+
+  <input type="file" id="fileInput" accept=".md,.markdown,text/markdown,text/plain">
+
+  <!-- TOOLBAR -->
+  <div class="toolbar" id="toolbar">
+    <span class="filename" id="filename"></span>
+    <div class="actions">
+      <button class="pdf-btn" id="pdfBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="1.5"/><path d="M6 17v4h12v-4"/></svg>
+        Save as PDF
+      </button>
+      <button class="new-file" id="newFileBtn" type="button">Open another file</button>
+    </div>
+  </div>
+
+  <!-- READING TOOLS -->
+  <div class="reading-tools" id="readingTools">
+    <button class="icon-btn" id="searchToggleBtn" type="button" title="Search" aria-label="Search" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.35-4.35"/></svg>
+    </button>
+    <div class="tool-sep"></div>
+    <button class="icon-btn font-btn" id="fontMinusBtn" type="button" title="Smaller text" aria-label="Smaller text">A−</button>
+    <button class="icon-btn font-btn" id="fontPlusBtn" type="button" title="Larger text" aria-label="Larger text">A+</button>
+    <div class="tool-sep"></div>
+    <button class="icon-btn" id="themeBtn" type="button" title="Change theme" aria-label="Change theme"></button>
+    <button class="icon-btn" id="tocBtn" type="button" title="Contents" aria-label="Contents">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg>
+    </button>
+    <span class="meta-text" id="metaText"></span>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div id="searchBar">
+    <input type="text" id="searchInput" placeholder="Search in text..." aria-label="Search in text">
+    <span class="search-count" id="searchCount">0/0</span>
+    <button class="icon-btn" id="searchPrevBtn" type="button" title="Previous match" aria-label="Previous match">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+    </button>
+    <button class="icon-btn" id="searchNextBtn" type="button" title="Next match" aria-label="Next match">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <button class="icon-btn" id="searchCloseBtn" type="button" title="Close search" aria-label="Close search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+  </div>
+
+  <!-- MARKDOWN PREVIEW -->
+  <div id="preview"></div>
+
+  <div class="empty-hint" id="emptyHint">Upload a .md file to see it rendered here</div>
+
+</div>
+
+<div id="tocBackdrop"></div>
+<div id="tocDrawer" role="dialog" aria-label="Contents">
+  <button class="toc-close" id="tocCloseBtn" type="button" aria-label="Close">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>
+  </button>
+  <h2>Contents</h2>
+  <nav id="tocList"></nav>
+</div>
+
+<script>
+
+/* =========================
+   ICONS (for JS-driven state)
+========================= */
+
+var ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>';
+var ICON_BOOK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>';
+var ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>';
+var ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+var ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
+
+/* =========================
+   ELEMENTS
+========================= */
+
+var dropzone = document.getElementById('dropzone');
+var fileInput = document.getElementById('fileInput');
+var preview = document.getElementById('preview');
+var toolbar = document.getElementById('toolbar');
+var filenameEl = document.getElementById('filename');
+var emptyHint = document.getElementById('emptyHint');
+var newFileBtn = document.getElementById('newFileBtn');
+var pdfBtn = document.getElementById('pdfBtn');
+var readingTools = document.getElementById('readingTools');
+var metaText = document.getElementById('metaText');
+var progressBar = document.getElementById('progressBar');
+
+var pasteToggle = document.getElementById('pasteToggle');
+var pastePanel = document.getElementById('pastePanel');
+var pasteArea = document.getElementById('pasteArea');
+var renderPasteBtn = document.getElementById('renderPasteBtn');
+var cancelPasteBtn = document.getElementById('cancelPasteBtn');
+var recentListEl = document.getElementById('recentList');
+
+var themeBtn = document.getElementById('themeBtn');
+var fontMinusBtn = document.getElementById('fontMinusBtn');
+var fontPlusBtn = document.getElementById('fontPlusBtn');
+var tocBtn = document.getElementById('tocBtn');
+var tocDrawer = document.getElementById('tocDrawer');
+var tocBackdrop = document.getElementById('tocBackdrop');
+var tocCloseBtn = document.getElementById('tocCloseBtn');
+var tocList = document.getElementById('tocList');
+
+var searchToggleBtn = document.getElementById('searchToggleBtn');
+var searchBar = document.getElementById('searchBar');
+var searchInput = document.getElementById('searchInput');
+var searchCount = document.getElementById('searchCount');
+var searchPrevBtn = document.getElementById('searchPrevBtn');
+var searchNextBtn = document.getElementById('searchNextBtn');
+var searchCloseBtn = document.getElementById('searchCloseBtn');
+
+var originalPreviewHTML = '';
+var searchHits = [];
+var currentHitIndex = -1;
+var fontSize = 16;
+var searchDebounceTimer = null;
+var scrollSpyObserver = null;
+
+/* =========================
+   STORAGE HELPERS
+========================= */
+
+function storageGet(key, fallback) {
+  try {
+    var v = localStorage.getItem(key);
+    return v === null ? fallback : v;
+  } catch (e) { return fallback; }
+}
+
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) { /* ignore */ }
+}
+
+/* =========================
+   THEME
+========================= */
+
+(function initTheme() {
+  var saved = storageGet('mdReaderTheme', null);
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  updateThemeBtnIcon(saved);
+})();
+
+function updateThemeBtnIcon(theme) {
+  var icons = { light: ICON_SUN, sepia: ICON_BOOK, dark: ICON_MOON };
+  themeBtn.innerHTML = icons[theme] || ICON_SUN;
+}
+
+themeBtn.addEventListener('click', function () {
+  var current = document.documentElement.getAttribute('data-theme');
+  var order = ['light', 'sepia', 'dark'];
+  var next = order[(order.indexOf(current) + 1) % order.length];
+  document.documentElement.setAttribute('data-theme', next);
+  storageSet('mdReaderTheme', next);
+  updateThemeBtnIcon(next);
+  if (searchHits.length) highlightMatches(searchInput.value);
+});
+
+/* =========================
+   FONT SIZE
+========================= */
+
+(function initFontSize() {
+  fontSize = parseInt(storageGet('mdReaderFontSize', '16'), 10) || 16;
+})();
+
+function applyFontSize() {
+  preview.style.fontSize = fontSize + 'px';
+  storageSet('mdReaderFontSize', String(fontSize));
+}
+
+fontMinusBtn.addEventListener('click', function () {
+  fontSize = Math.max(14, fontSize - 1);
+  applyFontSize();
+});
+
+fontPlusBtn.addEventListener('click', function () {
+  fontSize = Math.min(22, fontSize + 1);
+  applyFontSize();
+});
+
+/* =========================
+   OPEN FILE
+========================= */
+
+dropzone.addEventListener('click', function () { fileInput.click(); });
+
+fileInput.addEventListener('change', function (e) {
+  if (e.target.files && e.target.files[0]) readFileObject(e.target.files[0]);
+});
+
+dropzone.addEventListener('dragover', function (e) { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', function () { dropzone.classList.remove('drag'); });
+dropzone.addEventListener('drop', function (e) {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  if (e.dataTransfer.files && e.dataTransfer.files[0]) readFileObject(e.dataTransfer.files[0]);
+});
+
+newFileBtn.addEventListener('click', function () { fileInput.value = ''; resetToStart(); });
+
+function readFileObject(file) {
+  var reader = new FileReader();
+  reader.onload = function (e) { renderContent(e.target.result, file.name); };
+  reader.readAsText(file);
+}
+
+function resetToStart() {
+  preview.classList.remove('show');
+  toolbar.classList.remove('show');
+  readingTools.classList.remove('show');
+  searchBar.classList.remove('show');
+  dropzone.style.display = '';
+  emptyHint.style.display = '';
+  renderRecentsList();
+  fileInput.click();
+}
+
+/* =========================
+   PASTE TEXT
+========================= */
+
+pasteToggle.addEventListener('click', function () {
+  pastePanel.classList.toggle('show');
+  if (pastePanel.classList.contains('show')) pasteArea.focus();
+});
+
+cancelPasteBtn.addEventListener('click', function () {
+  pastePanel.classList.remove('show');
+  pasteArea.value = '';
+});
+
+renderPasteBtn.addEventListener('click', function () {
+  var text = pasteArea.value.trim();
+  if (!text) return;
+  renderContent(text, 'Pasted text');
+  pastePanel.classList.remove('show');
+  pasteArea.value = '';
+});
+
+/* =========================
+   RECENT FILES
+========================= */
+
+function getRecents() {
+  try { return JSON.parse(storageGet('mdReaderRecents', '[]')) || []; }
+  catch (e) { return []; }
+}
+
+function saveRecent(name, content) {
+  try {
+    var recents = getRecents().filter(function (r) { return r.name !== name; });
+    recents.unshift({ name: name, content: content, ts: Date.now() });
+    recents = recents.slice(0, 5);
+    storageSet('mdReaderRecents', JSON.stringify(recents));
+  } catch (e) { /* ignore */ }
+}
+
+function relativeTime(ts) {
+  var diffMin = Math.round((Date.now() - ts) / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return diffMin + ' min ago';
+  var diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return diffHr + ' hr ago';
+  return Math.round(diffHr / 24) + ' d ago';
+}
+
+function renderRecentsList() {
+  var recents = getRecents();
+  if (!recents.length || preview.classList.contains('show')) { recentListEl.innerHTML = ''; return; }
+  var html = '<div class="recent-title">Recent files</div>';
+  recents.forEach(function (r, i) {
+    html += '<button type="button" class="recent-item" onclick="openRecent(' + i + ')">' +
+      '<span class="rname">' + escapeHTML(r.name) + '</span>' +
+      '<span class="rtime">' + relativeTime(r.ts) + '</span></button>';
+  });
+  recentListEl.innerHTML = html;
+}
+
+function openRecent(index) {
+  var recents = getRecents();
+  var item = recents[index];
+  if (item) renderContent(item.content, item.name);
+}
+window.openRecent = openRecent;
+
+function escapeHTML(str) {
+  var div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+renderRecentsList();
+
+/* =========================
+   RENDER MARKDOWN
+========================= */
+
+function slugify(text, used) {
+  var slug = text.toString().trim().toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\u0980-\u09FF\w-]/g, '');
+  if (!slug) slug = 'section';
+  var base = slug, n = 1;
+  while (used[slug]) { slug = base + '-' + n; n++; }
+  used[slug] = true;
+  return slug;
+}
+
+function renderContent(raw, name) {
+  var html = marked.parse(raw);
+  preview.innerHTML = html;
+
+  // Heading IDs + TOC
+  var used = {};
+  var headings = Array.prototype.slice.call(preview.querySelectorAll('h1, h2, h3'));
+  var tocHtml = '';
+  headings.forEach(function (h) {
+    var level = parseInt(h.tagName.substring(1), 10);
+    var id = slugify(h.textContent, used);
+    h.id = id;
+    tocHtml += '<a href="#' + id + '" class="lvl-' + level + '">' + escapeHTML(h.textContent) + '</a>';
+  });
+  tocList.innerHTML = tocHtml;
+  tocBtn.style.display = headings.length ? '' : 'none';
+
+  // Code blocks: syntax highlight + copy buttons
+  var codeBlocks = preview.querySelectorAll('pre');
+  codeBlocks.forEach(function (pre) {
+    var codeEl = pre.querySelector('code');
+    if (codeEl && window.hljs) { try { hljs.highlightElement(codeEl); } catch (e) {} }
+    var wrap = document.createElement('div');
+    wrap.className = 'code-block-wrap';
+    pre.parentNode.insertBefore(wrap, pre);
+    wrap.appendChild(pre);
+    var btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.type = 'button';
+    btn.innerHTML = ICON_COPY + '<span>Copy</span>';
+    btn.setAttribute('onclick', 'copyCodeBlock(this)');
+    wrap.appendChild(btn);
+  });
+
+  // Cache clean HTML (post heading-ids, post-highlight, post-copy-buttons) for search reset
+  originalPreviewHTML = preview.innerHTML;
+
+  // Word count / reading time
+  var words = (preview.textContent || '').trim().split(/\s+/).filter(Boolean);
+  var wordCount = words.length;
+  var minutes = Math.max(1, Math.round(wordCount / 200));
+  metaText.textContent = wordCount + ' words · about ' + minutes + ' min read';
+
+  preview.classList.add('show');
+  applyFontSize();
+  dropzone.style.display = 'none';
+  pastePanel.classList.remove('show');
+  emptyHint.style.display = 'none';
+  toolbar.classList.add('show');
+  readingTools.classList.add('show');
+  filenameEl.textContent = name;
+  recentListEl.innerHTML = '';
+
+  clearHighlights();
+  initScrollSpy(headings);
+  window.scrollTo({ top: 0 });
+
+  saveRecent(name, raw);
+}
+
+function copyCodeBlock(btn) {
+  var pre = btn.parentNode.querySelector('pre code') || btn.parentNode.querySelector('pre');
+  var text = pre ? pre.textContent : '';
+  var done = function () {
+    btn.innerHTML = ICON_CHECK + '<span>Copied</span>';
+    setTimeout(function () { btn.innerHTML = ICON_COPY + '<span>Copy</span>'; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(done);
+  } else {
+    done();
+  }
+}
+window.copyCodeBlock = copyCodeBlock;
+
+/* =========================
+   SCROLLSPY
+========================= */
+
+function initScrollSpy(headings) {
+  if (scrollSpyObserver) { scrollSpyObserver.disconnect(); scrollSpyObserver = null; }
+  if (!('IntersectionObserver' in window) || !headings.length) return;
+  scrollSpyObserver = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) setActiveTocLink(entry.target.id);
+    });
+  }, { rootMargin: '0px 0px -75% 0px', threshold: 0 });
+  headings.forEach(function (h) { scrollSpyObserver.observe(h); });
+}
+
+function setActiveTocLink(id) {
+  var links = tocList.querySelectorAll('a');
+  links.forEach(function (a) { a.classList.toggle('toc-active', a.getAttribute('href') === '#' + id); });
+}
+
+/* =========================
+   PDF
+========================= */
+
+pdfBtn.addEventListener('click', function () { window.print(); });
+
+/* =========================
+   TOC DRAWER
+========================= */
+
+function openToc() {
+  tocDrawer.classList.add('show');
+  tocBackdrop.classList.add('show');
+  tocBtn.setAttribute('aria-pressed', 'true');
+}
+
+function closeToc() {
+  tocDrawer.classList.remove('show');
+  tocBackdrop.classList.remove('show');
+  tocBtn.setAttribute('aria-pressed', 'false');
+}
+
+tocBtn.addEventListener('click', function () {
+  if (tocDrawer.classList.contains('show')) closeToc(); else openToc();
+});
+tocBackdrop.addEventListener('click', closeToc);
+tocCloseBtn.addEventListener('click', closeToc);
+
+tocList.addEventListener('click', function (e) {
+  if (e.target.tagName === 'A') setTimeout(closeToc, 150);
+});
+
+/* =========================
+   SEARCH
+========================= */
+
+function escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function clearHighlights() {
+  if (originalPreviewHTML) preview.innerHTML = originalPreviewHTML;
+  searchHits = [];
+  currentHitIndex = -1;
+  updateSearchCount();
+}
+
+function highlightMatches(query) {
+  clearHighlights();
+  if (!query) return;
+  var regex = new RegExp(escapeRegex(query), 'gi');
+  var walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT, {
+    acceptNode: function (node) {
+      if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      var p = node.parentElement;
+      if (p && (p.tagName === 'SCRIPT' || p.tagName === 'STYLE')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  var textNodes = [];
+  var n;
+  while ((n = walker.nextNode())) textNodes.push(n);
+
+  textNodes.forEach(function (node) {
+    var text = node.nodeValue;
+    regex.lastIndex = 0;
+    if (!regex.test(text)) return;
+    regex.lastIndex = 0;
+    var frag = document.createDocumentFragment();
+    var lastIdx = 0, m;
+    while ((m = regex.exec(text))) {
+      if (m.index > lastIdx) frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+      var mark = document.createElement('mark');
+      mark.className = 'hit';
+      mark.textContent = m[0];
+      frag.appendChild(mark);
+      lastIdx = m.index + m[0].length;
+      if (m[0].length === 0) regex.lastIndex++;
+    }
+    if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    node.parentNode.replaceChild(frag, node);
+  });
+
+  searchHits = Array.prototype.slice.call(preview.querySelectorAll('mark.hit'));
+  currentHitIndex = searchHits.length ? 0 : -1;
+  updateSearchCount();
+  focusCurrentHit();
+}
+
+function focusCurrentHit() {
+  searchHits.forEach(function (h) { h.classList.remove('current'); });
+  if (currentHitIndex >= 0 && searchHits[currentHitIndex]) {
+    var hit = searchHits[currentHitIndex];
+    hit.classList.add('current');
+    hit.scrollIntoView({ block: 'center' });
+  }
+}
+
+function updateSearchCount() {
+  searchCount.textContent = searchHits.length ? (currentHitIndex + 1) + '/' + searchHits.length : '0/0';
+}
+
+searchToggleBtn.addEventListener('click', function () {
+  var showing = searchBar.classList.toggle('show');
+  searchToggleBtn.setAttribute('aria-pressed', showing ? 'true' : 'false');
+  if (showing) { searchInput.focus(); }
+  else { clearHighlights(); searchInput.value = ''; }
+});
+
+searchInput.addEventListener('input', function () {
+  clearTimeout(searchDebounceTimer);
+  var val = searchInput.value;
+  searchDebounceTimer = setTimeout(function () { highlightMatches(val); }, 150);
+});
+
+searchInput.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); goToHit(e.shiftKey ? -1 : 1); }
+});
+
+function goToHit(dir) {
+  if (!searchHits.length) return;
+  currentHitIndex = (currentHitIndex + dir + searchHits.length) % searchHits.length;
+  focusCurrentHit();
+  updateSearchCount();
+}
+
+searchNextBtn.addEventListener('click', function () { goToHit(1); });
+searchPrevBtn.addEventListener('click', function () { goToHit(-1); });
+searchCloseBtn.addEventListener('click', function () {
+  searchBar.classList.remove('show');
+  searchToggleBtn.setAttribute('aria-pressed', 'false');
+  searchInput.value = '';
+  clearHighlights();
+});
+
+/* =========================
+   KEYBOARD SHORTCUTS
+========================= */
+
+document.addEventListener('keydown', function (e) {
+  var typingInField = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+    e.preventDefault();
+    fileInput.click();
+  } else if (e.key === '/' && !typingInField && preview.classList.contains('show')) {
+    e.preventDefault();
+    searchBar.classList.add('show');
+    searchToggleBtn.setAttribute('aria-pressed', 'true');
+    searchInput.focus();
+  } else if (e.key === 'Escape') {
+    if (tocDrawer.classList.contains('show')) closeToc();
+    else if (searchBar.classList.contains('show') && typingInField) searchCloseBtn.click();
+  }
+});
+
+/* =========================
+   READING PROGRESS
+========================= */
+
+function updateProgress() {
+  var scrollTop = window.scrollY || document.documentElement.scrollTop;
+  var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+  var pct = docHeight > 0 ? Math.min(100, (scrollTop / docHeight) * 100) : 0;
+  progressBar.style.width = pct + '%';
+}
+
+window.addEventListener('scroll', updateProgress, { passive: true });
+window.addEventListener('resize', updateProgress);
+
+</script>
+
+</body>
+</html>
